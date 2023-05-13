@@ -1,0 +1,18 @@
+version=0.1
+
+[dev.deploy.parameters]
+capabilities = "CAPABILITY_IAM CAPABILITY_NAMED_IAM"
+region = "eu-central-1"
+s3_prefix = "chat-messaging"
+stack_name = "serverless-chat-dev"
+s3_bucket = "serverless-chat-dev-s3-deployment-bucket"
+parameter_overrides="Environment=dev"
+
+
+[prod.deploy.parameters]
+capabilities = "CAPABILITY_IAM"
+region = "eu-central-1"
+s3_prefix = "chat-messaging"
+stack_name = "serverless-chat-prod"
+s3_bucket = "serverless-chat-prod-s3-deployment-bucket"
+parameter_overrides="Environment=prod"

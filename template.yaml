@@ -1,0 +1,351 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: Serverless Chat
+
+Parameters:
+  Environment:
+    Type: String
+    AllowedValues:
+      - dev
+      - prod
+
+Globals:
+  Function:
+    Timeout: 12
+    MemorySize: 512
+    Runtime: nodejs16.x
+    CodeUri: lambda_js
+    Architectures:
+      - x86_64
+
+Resources:
+  # WebSocket Api
+  ChatWebsocketApi:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: !Sub ${AWS::StackName}-chat-websocket-api
+      ProtocolType: WEBSOCKET
+      RouteSelectionExpression: "$request.body.action"
+
+  #  Routes
+  ConnectRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref ChatWebsocketApi
+      RouteKey: $connect
+      AuthorizationType: NONE
+      OperationName: ConnectRoute
+      Target: !Join
+        - "/"
+        - - "integrations"
+          - !Ref ConnectInteg
+  ConnectInteg:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref ChatWebsocketApi
+      Description: Connect Integration
+      IntegrationType: AWS_PROXY
+      IntegrationUri:
+        Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ConnectLambdaFunction.Arn}/invocations
+
+  DisconnectRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref ChatWebsocketApi
+      RouteKey: $disconnect
+      AuthorizationType: NONE
+      OperationName: DisconnectRoute
+      Target: !Join
+        - "/"
+        - - "integrations"
+          - !Ref DisconnectInteg
+  DisconnectInteg:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref ChatWebsocketApi
+      Description: Disconnect Integration
+      IntegrationType: AWS_PROXY
+      IntegrationUri:
+        Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${DisconnectLambdaFunction.Arn}/invocations
+
+  SendMessageRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref ChatWebsocketApi
+      RouteKey: sendMessage
+      AuthorizationType: NONE
+      OperationName: SendMessageRoute
+      Target: !Join
+        - "/"
+        - - "integrations"
+          - !Ref SendMessageInteg
+  SendMessageInteg:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref ChatWebsocketApi
+      Description: Send Integration
+      IntegrationType: AWS_PROXY
+      IntegrationUri:
+        Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${SendMessageLambdaFunction.Arn}/invocations
+
+  GetClientsRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref ChatWebsocketApi
+      RouteKey: getClients
+      AuthorizationType: NONE
+      OperationName: GetClientsRoute
+      Target: !Join
+        - "/"
+        - - "integrations"
+          - !Ref GetClientsInteg
+  GetClientsInteg:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref ChatWebsocketApi
+      Description: Get Clients Integration
+      IntegrationType: AWS_PROXY
+      IntegrationUri:
+        Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GetClientsLambdaFunction.Arn}/invocations
+
+  GetMessagesRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref ChatWebsocketApi
+      RouteKey: getMessages
+      AuthorizationType: NONE
+      OperationName: GetMessagesRoute
+      Target: !Join
+        - "/"
+        - - "integrations"
+          - !Ref GetMessagesInteg
+  GetMessagesInteg:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref ChatWebsocketApi
+      Description: Get Messages Integration
+      IntegrationType: AWS_PROXY
+      IntegrationUri:
+        Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GetMessagesLambdaFunction.Arn}/invocations
+
+  # API Development
+  Deployment:
+    Type: AWS::ApiGatewayV2::Deployment
+    DependsOn:
+      - ConnectRoute
+      - DisconnectRoute
+      - SendMessageRoute
+      - GetClientsRoute
+      - GetMessagesRoute
+    Properties:
+      ApiId: !Ref ChatWebsocketApi
+  Stage:
+    Type: AWS::ApiGatewayV2::Stage
+    Properties:
+      StageName: Prod
+      Description: Prod Stage
+      # StageName: ${enironment}
+      # Description: ${enironment} Stage
+      DeploymentId: !Ref Deployment
+      ApiId: !Ref ChatWebsocketApi
+
+  # #  Lambdas
+  ConnectLambdaFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub ${AWS::StackName}-fn-connect
+      Handler: functions/connect/function.handler
+      Environment:
+        Variables:
+          CLIENTS_TABLE: !ImportValue serverless-chat-db-dev-ClientsTableName
+          MESSAGES_TABLE: !ImportValue serverless-chat-db-dev-MessagesTableName
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !ImportValue serverless-chat-db-dev-ClientsTableName
+        - DynamoDBCrudPolicy:
+            TableName: !ImportValue serverless-chat-db-dev-MessagesTableName
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Target: es2020
+        EntryPoints:
+          - functions/connect/function.ts
+  OnConnectPermission:
+    Type: AWS::Lambda::Permission
+    DependsOn:
+      - ChatWebsocketApi
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref ConnectLambdaFunction
+      Principal: apigateway.amazonaws.com
+
+  DisconnectLambdaFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub ${AWS::StackName}-fn-disconnect
+      Handler: functions/disconnect/function.handler
+      Environment:
+        Variables:
+          CLIENTS_TABLE: !ImportValue serverless-chat-db-dev-ClientsTableName
+          MESSAGES_TABLE: !ImportValue serverless-chat-db-dev-MessagesTableName
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !ImportValue serverless-chat-db-dev-ClientsTableName
+        - DynamoDBCrudPolicy:
+            TableName: !ImportValue serverless-chat-db-dev-MessagesTableName
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Target: es2020
+        EntryPoints:
+          - functions/disconnect/function.ts
+  OnDisconnectPermission:
+    Type: AWS::Lambda::Permission
+    DependsOn:
+      - ChatWebsocketApi
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref DisconnectLambdaFunction
+      Principal: apigateway.amazonaws.com
+
+  SendMessageLambdaFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub ${AWS::StackName}-fn-send_message
+      Handler: functions/sendMessage/function.handler
+      Environment:
+        Variables:
+          CLIENTS_TABLE: !ImportValue serverless-chat-db-dev-ClientsTableName
+          MESSAGES_TABLE: !ImportValue serverless-chat-db-dev-MessagesTableName
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !ImportValue serverless-chat-db-dev-ClientsTableName
+        - DynamoDBCrudPolicy:
+            TableName: !ImportValue serverless-chat-db-dev-MessagesTableName
+        - Statement:
+            - Effect: Allow
+              Action:
+                - "execute-api:ManageConnections"
+              Resource:
+                - !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ChatWebsocketApi}/*"
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Target: es2020
+        EntryPoints:
+          - functions/sendMessage/function.ts
+  SendMessagePermission:
+    Type: AWS::Lambda::Permission
+    DependsOn:
+      - ChatWebsocketApi
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref SendMessageLambdaFunction
+      Principal: apigateway.amazonaws.com
+
+  GetClientsLambdaFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub ${AWS::StackName}-fn-get_clients
+      Handler: functions/getClients/function.handler
+      Environment:
+        Variables:
+          CLIENTS_TABLE: !ImportValue serverless-chat-db-dev-ClientsTableName
+          MESSAGES_TABLE: !ImportValue serverless-chat-db-dev-MessagesTableName
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !ImportValue serverless-chat-db-dev-ClientsTableName
+        - DynamoDBCrudPolicy:
+            TableName: !ImportValue serverless-chat-db-dev-MessagesTableName
+        - Statement:
+            - Effect: Allow
+              Action:
+                - "execute-api:ManageConnections"
+              Resource:
+                - !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ChatWebsocketApi}/*"
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Target: es2020
+        EntryPoints:
+          - functions/getClients/function.ts
+  GetClientsPermission:
+    Type: AWS::Lambda::Permission
+    DependsOn:
+      - ChatWebsocketApi
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref GetClientsLambdaFunction
+      Principal: apigateway.amazonaws.com
+
+  GetMessagesLambdaFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub ${AWS::StackName}-fn-get_messages
+      Handler: functions/getMessages/function.handler
+      Environment:
+        Variables:
+          CLIENTS_TABLE: !ImportValue serverless-chat-db-dev-ClientsTableName
+          MESSAGES_TABLE: !ImportValue serverless-chat-db-dev-MessagesTableName
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !ImportValue serverless-chat-db-dev-ClientsTableName
+        - DynamoDBCrudPolicy:
+            TableName: !ImportValue serverless-chat-db-dev-MessagesTableName
+        - Statement:
+            - Effect: Allow
+              Action:
+                - "execute-api:ManageConnections"
+              Resource:
+                - !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ChatWebsocketApi}/*"
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Target: es2020
+        EntryPoints:
+          - functions/getMessages/function.ts
+  GetMessagesPermission:
+    Type: AWS::Lambda::Permission
+    DependsOn:
+      - ChatWebsocketApi
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref GetMessagesLambdaFunction
+      Principal: apigateway.amazonaws.com
+
+# Outputs
+Outputs:
+  ConnectLambdaFunctionArn:
+    Description: "OnConnect function ARN"
+    Value: !GetAtt ConnectLambdaFunction.Arn
+
+  DisconnectLambdaFunctionArn:
+    Description: "OnDisconnect function ARN"
+    Value: !GetAtt DisconnectLambdaFunction.Arn
+
+  SendMessageLambdaFunctionArn:
+    Description: "SendMessage function ARN"
+    Value: !GetAtt SendMessageLambdaFunction.Arn
+
+  GetClientsLambdaFunctionArn:
+    Description: "GetClients lambda function ARN"
+    Value: !GetAtt GetClientsLambdaFunction.Arn
+
+  GetMessagesLambdaFunctionArn:
+    Description: "GetMessages function ARN"
+    Value: !GetAtt GetMessagesLambdaFunction.Arn
+
+  WebSocketURI:
+    Description: "The WSS Protocol URI to connect to"
+    Value:
+      !Join [
+        "",
+        [
+          "wss://",
+          !Ref ChatWebsocketApi,
+          ".execute-api.",
+          !Ref "AWS::Region",
+          ".amazonaws.com/",
+          !Ref "Stage",
+        ],
+      ]
