@@ -1,23 +1,29 @@
-import { APIGatewayProxyEvent } from "aws-lambda";
+import { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
+import AWS from "aws-sdk/clients/dynamodb";
 
-export async function handler(event: APIGatewayProxyEvent) {
+const DocClient = new AWS.DocumentClient();
+
+export async function handler(
+  event: APIGatewayProxyEvent
+): Promise<APIGatewayProxyResult> {
   try {
-    if (!event.body) {
-      throw {
-        code: 400,
-        message: "BodyNotProvided",
-      };
+    const routeKey = event.requestContext.routeKey as string;
+    const connectionId = event.requestContext.connectionId as string;
+
+    if (routeKey !== "$disconnect") {
+      throw new Error("WrongConnectionRoute");
     }
-    const rawBody = JSON.parse(event.body);
-    if (!rawBody) {
-      throw {
-        code: 400,
-        message: "InputNotProvided",
-      };
-    }
+
+    await DocClient.delete({
+      TableName: process.env.CLIENTS_TABLE as string,
+      Key: {
+        connectionId,
+      },
+    }).promise();
 
     return {
       statusCode: 200,
+      body: "success",
     };
   } catch (error) {
     return {

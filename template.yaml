@@ -142,10 +142,10 @@ Resources:
   Stage:
     Type: AWS::ApiGatewayV2::Stage
     Properties:
-      StageName: Prod
-      Description: Prod Stage
-      # StageName: ${enironment}
-      # Description: ${enironment} Stage
+      # StageName: Prod
+      # Description: Prod Stage
+      StageName: !Ref Environment
+      Description: !Sub ${Environment} Stage
       DeploymentId: !Ref Deployment
       ApiId: !Ref ChatWebsocketApi
 
@@ -252,6 +252,7 @@ Resources:
         Variables:
           CLIENTS_TABLE: !ImportValue serverless-chat-db-dev-ClientsTableName
           MESSAGES_TABLE: !ImportValue serverless-chat-db-dev-MessagesTableName
+          WSSAPIGATEWAYENDPOINT: !Sub "wss://${ChatWebsocketApi}.execute-api.${AWS::Region}.amazonaws.com/${Environment}"
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !ImportValue serverless-chat-db-dev-ClientsTableName

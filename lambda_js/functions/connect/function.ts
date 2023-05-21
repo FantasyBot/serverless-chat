@@ -1,23 +1,40 @@
-import { APIGatewayProxyEvent } from "aws-lambda";
+import {
+  APIGatewayProxyEvent,
+  APIGatewayProxyResult,
+  APIGatewayProxyEventQueryStringParameters,
+} from "aws-lambda";
+import AWS from "aws-sdk/clients/dynamodb";
 
-export async function handler(event: APIGatewayProxyEvent) {
+const DocClient = new AWS.DocumentClient();
+
+export async function handler(
+  event: APIGatewayProxyEvent
+): Promise<APIGatewayProxyResult> {
   try {
-    if (!event.body) {
-      throw {
-        code: 400,
-        message: "BodyNotProvided",
-      };
+    const routeKey = event.requestContext.routeKey as string;
+    const connectionId = event.requestContext.connectionId as string;
+    const queryParams =
+      event.queryStringParameters as APIGatewayProxyEventQueryStringParameters | null;
+
+    if (routeKey !== "$connect") {
+      throw new Error("WrongConnectionRoute");
     }
-    const rawBody = JSON.parse(event.body);
-    if (!rawBody) {
-      throw {
-        code: 400,
-        message: "InputNotProvided",
-      };
+
+    if (!queryParams || !queryParams["nickname"]) {
+      throw new Error("NicknameNotProvided");
     }
+
+    await DocClient.put({
+      TableName: process.env.CLIENTS_TABLE as string,
+      Item: {
+        connectionId,
+        nickname: queryParams["nickname"],
+      },
+    }).promise();
 
     return {
       statusCode: 200,
+      body: "success",
     };
   } catch (error) {
     return {
