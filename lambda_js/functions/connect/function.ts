@@ -3,9 +3,8 @@ import {
   APIGatewayProxyResult,
   APIGatewayProxyEventQueryStringParameters,
 } from "aws-lambda";
-import AWS from "aws-sdk/clients/dynamodb";
-
-const DocClient = new AWS.DocumentClient();
+import { notifyClients } from "../../utils/notifyClients";
+import { DocClient } from "../../config/instances";
 
 export async function handler(
   event: APIGatewayProxyEvent
@@ -17,11 +16,17 @@ export async function handler(
       event.queryStringParameters as APIGatewayProxyEventQueryStringParameters | null;
 
     if (routeKey !== "$connect") {
-      throw new Error("WrongConnectionRoute");
+      throw {
+        code: 403,
+        message: "WrongConnectionRoute",
+      };
     }
 
     if (!queryParams || !queryParams["nickname"]) {
-      throw new Error("NicknameNotProvided");
+      throw {
+        code: 403,
+        message: "NicknameNotProvided",
+      };
     }
 
     await DocClient.put({
@@ -32,11 +37,15 @@ export async function handler(
       },
     }).promise();
 
+    await notifyClients(connectionId);
+
     return {
       statusCode: 200,
       body: "success",
     };
   } catch (error) {
+    console.log(" Error - >", error);
+
     return {
       statusCode: error.code,
       body: JSON.stringify({

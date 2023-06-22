@@ -1,7 +1,6 @@
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
-import AWS from "aws-sdk/clients/dynamodb";
-
-const DocClient = new AWS.DocumentClient();
+import { getAllClients } from "../../utils/getAllClients";
+import { postToConnection } from "../../utils/postToConnection";
 
 export async function handler(
   event: APIGatewayProxyEvent
@@ -11,15 +10,15 @@ export async function handler(
     const connectionId = event.requestContext.connectionId as string;
 
     if (routeKey !== "$disconnect") {
-      throw new Error("WrongConnectionRoute");
+      throw {
+        code: 403,
+        message: "WrongConnectionRoute",
+      };
     }
 
-    await DocClient.delete({
-      TableName: process.env.CLIENTS_TABLE as string,
-      Key: {
-        connectionId,
-      },
-    }).promise();
+    const clients = await getAllClients();
+
+    await postToConnection(connectionId, JSON.stringify(clients));
 
     return {
       statusCode: 200,
