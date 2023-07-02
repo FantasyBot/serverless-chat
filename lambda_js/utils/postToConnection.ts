@@ -13,6 +13,8 @@ export async function postToConnection(
 
     return true;
   } catch (error) {
+    console.log("Error in postToConnection - - - >", error);
+
     if ((error as AWSError).statusCode === 410) {
       await DocClient.delete({
         TableName: process.env.CLIENTS_TABLE as string,

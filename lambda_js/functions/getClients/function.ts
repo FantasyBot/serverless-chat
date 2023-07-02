@@ -9,22 +9,28 @@ export async function handler(
     const routeKey = event.requestContext.routeKey as string;
     const connectionId = event.requestContext.connectionId as string;
 
-    if (routeKey !== "$disconnect") {
+    if (routeKey !== "getClients") {
       throw {
         code: 403,
         message: "WrongConnectionRoute",
       };
     }
 
-    const clients = await getAllClients();
-
-    await postToConnection(connectionId, JSON.stringify(clients));
+    await postToConnection(
+      connectionId,
+      JSON.stringify({
+        type: "clients",
+        value: await getAllClients(),
+      })
+    );
 
     return {
       statusCode: 200,
       body: "success",
     };
   } catch (error) {
+    console.log("Error in getClients  - - > ", error);
+
     return {
       statusCode: error.code,
       body: JSON.stringify({

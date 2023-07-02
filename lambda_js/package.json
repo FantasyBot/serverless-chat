@@ -30,7 +30,7 @@
   "dependencies": {
     "@fantasybot/order-processing-lib": "^1.0.4",
     "aws-lambda": "^1.0.7",
-    "aws-sdk": "^2.1239.0",
+    "aws-sdk": "^2.1409.0",
     "class-validator": "^0.13.2",
     "moment": "^2.29.4",
     "msw": "^0.49.2",

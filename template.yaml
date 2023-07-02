@@ -17,6 +17,15 @@ Globals:
     CodeUri: lambda_js
     Architectures:
       - x86_64
+    Environment:
+      Variables:
+        CLIENTS_TABLE: 
+          !ImportValue
+            Fn::Sub: "serverless-chat-db-${Environment}-ClientsTableName"
+        MESSAGES_TABLE: 
+          !ImportValue 
+            Fn::Sub: "serverless-chat-db-${Environment}-MessagesTableName"
+        WSSAPIGATEWAYENDPOINT: !Sub "${ChatWebsocketApi}.execute-api.${AWS::Region}.amazonaws.com/${Environment}"  
 
 Resources:
   # WebSocket Api
@@ -142,8 +151,6 @@ Resources:
   Stage:
     Type: AWS::ApiGatewayV2::Stage
     Properties:
-      # StageName: Prod
-      # Description: Prod Stage
       StageName: !Ref Environment
       Description: !Sub ${Environment} Stage
       DeploymentId: !Ref Deployment
@@ -155,15 +162,17 @@ Resources:
     Properties:
       FunctionName: !Sub ${AWS::StackName}-fn-connect
       Handler: functions/connect/function.handler
-      Environment:
-        Variables:
-          CLIENTS_TABLE: !ImportValue serverless-chat-db-dev-ClientsTableName
-          MESSAGES_TABLE: !ImportValue serverless-chat-db-dev-MessagesTableName
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !ImportValue serverless-chat-db-dev-ClientsTableName
         - DynamoDBCrudPolicy:
             TableName: !ImportValue serverless-chat-db-dev-MessagesTableName
+        - Statement:
+            - Effect: Allow
+              Action:
+                - "execute-api:ManageConnections"
+              Resource:
+                - !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ChatWebsocketApi}/*"    
     Metadata:
       BuildMethod: esbuild
       BuildProperties:
@@ -184,15 +193,17 @@ Resources:
     Properties:
       FunctionName: !Sub ${AWS::StackName}-fn-disconnect
       Handler: functions/disconnect/function.handler
-      Environment:
-        Variables:
-          CLIENTS_TABLE: !ImportValue serverless-chat-db-dev-ClientsTableName
-          MESSAGES_TABLE: !ImportValue serverless-chat-db-dev-MessagesTableName
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !ImportValue serverless-chat-db-dev-ClientsTableName
         - DynamoDBCrudPolicy:
             TableName: !ImportValue serverless-chat-db-dev-MessagesTableName
+        - Statement:
+            - Effect: Allow
+              Action:
+                - "execute-api:ManageConnections"
+              Resource:
+                - !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ChatWebsocketApi}/*"
     Metadata:
       BuildMethod: esbuild
       BuildProperties:
@@ -213,10 +224,6 @@ Resources:
     Properties:
       FunctionName: !Sub ${AWS::StackName}-fn-send_message
       Handler: functions/sendMessage/function.handler
-      Environment:
-        Variables:
-          CLIENTS_TABLE: !ImportValue serverless-chat-db-dev-ClientsTableName
-          MESSAGES_TABLE: !ImportValue serverless-chat-db-dev-MessagesTableName
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !ImportValue serverless-chat-db-dev-ClientsTableName
@@ -252,7 +259,7 @@ Resources:
         Variables:
           CLIENTS_TABLE: !ImportValue serverless-chat-db-dev-ClientsTableName
           MESSAGES_TABLE: !ImportValue serverless-chat-db-dev-MessagesTableName
-          WSSAPIGATEWAYENDPOINT: !Sub "wss://${ChatWebsocketApi}.execute-api.${AWS::Region}.amazonaws.com/${Environment}"
+          WSSAPIGATEWAYENDPOINT: !Sub "${ChatWebsocketApi}.execute-api.${AWS::Region}.amazonaws.com/${Environment}"
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !ImportValue serverless-chat-db-dev-ClientsTableName
@@ -284,10 +291,6 @@ Resources:
     Properties:
       FunctionName: !Sub ${AWS::StackName}-fn-get_messages
       Handler: functions/getMessages/function.handler
-      Environment:
-        Variables:
-          CLIENTS_TABLE: !ImportValue serverless-chat-db-dev-ClientsTableName
-          MESSAGES_TABLE: !ImportValue serverless-chat-db-dev-MessagesTableName
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !ImportValue serverless-chat-db-dev-ClientsTableName

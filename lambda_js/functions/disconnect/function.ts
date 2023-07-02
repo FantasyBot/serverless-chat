@@ -27,14 +27,18 @@ export async function handler(
 
     return {
       statusCode: 200,
-      body: "success",
+      body: "Disconnected",
     };
   } catch (error) {
+    console.log("Error in disconnect - - - >", error);
+
     return {
       statusCode: error.code,
-      body: JSON.stringify({
-        message: error.message,
-      }),
+      body:
+        "Failed to disconnect:" +
+        JSON.stringify({
+          message: error.message,
+        }),
     };
   }
 }

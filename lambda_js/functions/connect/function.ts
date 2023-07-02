@@ -41,16 +41,18 @@ export async function handler(
 
     return {
       statusCode: 200,
-      body: "success",
+      body: "Connected",
     };
   } catch (error) {
-    console.log(" Error - >", error);
+    console.log(" Error in connect lamda - >", error);
 
     return {
       statusCode: error.code,
-      body: JSON.stringify({
-        message: error.message,
-      }),
+      body:
+        "Failed to connect: " +
+        JSON.stringify({
+          message: error.message,
+        }),
     };
   }
 }
