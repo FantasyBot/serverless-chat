@@ -5,6 +5,8 @@ import {
 } from "aws-lambda";
 import { notifyClients } from "../../utils/notifyClients";
 import { DocClient } from "../../config/instances";
+import { getConnectionIdByNickname } from "../../utils/getConnectionIdByNickname";
+import { postToConnection } from "../../utils/postToConnection";
 
 export async function handler(
   event: APIGatewayProxyEvent
@@ -26,6 +28,23 @@ export async function handler(
       throw {
         code: 403,
         message: "NicknameNotProvided",
+      };
+    }
+
+    const existingConnectionId = await getConnectionIdByNickname(
+      queryParams["nickname"]
+    );
+
+    if (
+      existingConnectionId &&
+      (await postToConnection(
+        existingConnectionId,
+        JSON.stringify({ type: "ping" })
+      ))
+    ) {
+      return {
+        statusCode: 403,
+        body: "",
       };
     }
 
