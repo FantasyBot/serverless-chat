@@ -1,9 +1,10 @@
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
-import { ApiGw, DocClient } from "../../config/instances";
+import { DocClient } from "../../config/instances";
 import { v4 } from "uuid";
 import { getConnectionIdByNickname } from "../../utils/getConnectionIdByNickname";
 import { SendMessageBody } from "../../config/types";
 import { getClient } from "../../utils/getClient";
+import { postToConnection } from "../../utils/postToConnection";
 
 // {"action":"sendMessage","message":"Hello","recipientNickname":"gura"}
 
@@ -45,6 +46,22 @@ export async function handler(
       .sort()
       .join("#");
 
+    const recipientConnectionId = await getConnectionIdByNickname(
+      parsedSendMessageBody.recipientNickname
+    );
+
+    if (!recipientConnectionId) {
+      await postToConnection(
+        connectionId,
+        JSON.stringify({ type: "error", message: "WrongNickname" })
+      );
+
+      return {
+        statusCode: 200,
+        body: "",
+      };
+    }
+
     await DocClient.put({
       TableName: process.env.MESSAGES_TABLE as string,
       Item: {
@@ -56,53 +73,25 @@ export async function handler(
       },
     }).promise();
 
-    const recipientConnectionId = await getConnectionIdByNickname(
-      parsedSendMessageBody.recipientNickname
-    );
-
-    if (!recipientConnectionId) {
-      console.log("_--------NorecipientConnectionId - - - -  -");
-
-      // await ApiGw.postToConnection(
-      //   connectionId,
-      //   JSON.stringify({ type: "error", message: error.message })
-      // );
-      return {
-        statusCode: 200,
-        body: "WrongNickname",
-      };
-    }
-
     if (recipientConnectionId) {
-      await ApiGw.postToConnection({
-        ConnectionId: recipientConnectionId,
-        Data: JSON.stringify({
+      await postToConnection(
+        recipientConnectionId,
+        JSON.stringify({
           type: "message",
           value: {
             sender: client.nickname,
             message: parsedSendMessageBody.message,
           },
-        }),
-      }).promise();
+        })
+      );
     }
+
     return {
       statusCode: 200,
       body: "",
     };
   } catch (error) {
     console.log(" Error in SendMessage - >", error);
-
-    // @TODO
-    // if (error instanceof HandlerError) {
-    //   await postToConnection(
-    //     connectionId,
-    //     JSON.stringify({ type: "error", message: error.message })
-    //   );
-    //   return {
-    //     statusCode: 200,
-    //     body: "Connected",
-    //   };
-    // }
 
     return {
       statusCode: error.code,

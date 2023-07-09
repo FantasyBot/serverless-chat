@@ -2,6 +2,8 @@ import { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
 import { getAllClients } from "../../utils/getAllClients";
 import { postToConnection } from "../../utils/postToConnection";
 
+// {"action":"getClients"}
+
 export async function handler(
   event: APIGatewayProxyEvent
 ): Promise<APIGatewayProxyResult> {

@@ -4,6 +4,8 @@ import { GetMessagesBody } from "../../config/types";
 import { postToConnection } from "../../utils/postToConnection";
 import { getClient } from "../../utils/getClient";
 
+// {"action":"getMessages","targetNickname":"gura","limit":"50"}
+
 export async function handler(
   event: APIGatewayProxyEvent
 ): Promise<APIGatewayProxyResult> {
