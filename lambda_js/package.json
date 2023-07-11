@@ -28,7 +28,6 @@
     "typescript": "^4.8.4"
   },
   "dependencies": {
-    "@fantasybot/order-processing-lib": "^1.0.4",
     "aws-lambda": "^1.0.7",
     "aws-sdk": "^2.1409.0",
     "class-validator": "^0.13.2",
